@@ -1,4 +1,4 @@
-// Alexa Assistant - Solo cambiamos showStatusIndicator y hideStatusIndicator
+// Alexa Assistant - Con dos sonidos diferentes para confirmación
 class AlexaAssistant {
     constructor() {
         this.isActive = false;
@@ -6,11 +6,107 @@ class AlexaAssistant {
         this.isSpeaking = false;
         this.recognition = null;
         this.wakeWord = "alexa";
+        this.lastCommandTime = 0;
+        
+        // Inicializar audio
+        this.audioContext = null;
+        this.initAudio();
         
         this.toggleAlexa = this.toggleAlexa.bind(this);
         this.setupRecognition = this.setupRecognition.bind(this);
         
         setTimeout(() => this.initialize(), 100);
+    }
+    
+    initAudio() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('✅ AudioContext inicializado');
+        } catch (error) {
+            console.log('AudioContext no soportado');
+        }
+    }
+    
+    // SONIDO 1: Cuando detecta "Alexa" (tono alto y corto)
+    playWakeSound() {
+        if (!this.audioContext || this.audioContext.state === 'suspended') {
+            try {
+                this.audioContext.resume();
+            } catch (error) {
+                console.log('No se puede reproducir sonido:', error);
+                return;
+            }
+        }
+        
+        try {
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Sonido de activación - tono más alto
+            oscillator.frequency.value = 1200; // Hz
+            oscillator.type = 'sine';
+            
+            const now = this.audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.15, now + 0.03); // Ataque rápido
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.15);
+            
+            oscillator.start(now);
+            oscillator.stop(now + 0.15);
+            
+            oscillator.onended = () => {
+                oscillator.disconnect();
+                gainNode.disconnect();
+            };
+            
+        } catch (error) {
+            console.log('Error reproduciendo sonido de activación');
+        }
+    }
+    
+    // SONIDO 2: Cuando procesa la petición (tono bajo y más largo)
+    playProcessSound() {
+        if (!this.audioContext || this.audioContext.state === 'suspended') {
+            try {
+                this.audioContext.resume();
+            } catch (error) {
+                console.log('No se puede reproducir sonido:', error);
+                return;
+            }
+        }
+        
+        try {
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Sonido de procesamiento - tono más bajo
+            oscillator.frequency.value = 800; // Hz
+            oscillator.type = 'sine';
+            
+            const now = this.audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.12, now + 0.05); // Ataque más suave
+            gainNode.gain.exponentialRampToValueAtTime(0.05, now + 0.2);
+            gainNode.gain.linearRampToValueAtTime(0, now + 0.3);
+            
+            oscillator.start(now);
+            oscillator.stop(now + 0.3);
+            
+            oscillator.onended = () => {
+                oscillator.disconnect();
+                gainNode.disconnect();
+            };
+            
+        } catch (error) {
+            console.log('Error reproduciendo sonido de procesamiento');
+        }
     }
     
     initialize() {
@@ -43,6 +139,10 @@ class AlexaAssistant {
                         transcript.startsWith(this.wakeWord + '.')) {
                         
                         console.log('✅ Alexa detectada');
+                        
+                        // SONIDO 1: Confirmación de activación
+                        this.playWakeSound();
+                        
                         this.processAlexaCommand(transcript);
                     }
                 }
@@ -117,6 +217,11 @@ class AlexaAssistant {
         }
         
         console.log('Comando extraído:', command);
+        
+        // SONIDO 2: Confirmación de que procesará el comando
+        setTimeout(() => {
+            this.playProcessSound();
+        }, 150);
         
         if (this.isStopCommand(command)) {
             console.log('🚫 COMANDO DE DETENER DETECTADO');
@@ -404,6 +509,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         const assistant = new AlexaAssistant();
         window.alexaAssistant = assistant;
-        console.log('✅ Alexa Assistant listo - Indicador en panel');
+        console.log('✅ Alexa Assistant listo - Con dos sonidos diferentes');
     }, 1000);
 });
