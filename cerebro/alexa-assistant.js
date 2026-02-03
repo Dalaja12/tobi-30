@@ -6,11 +6,6 @@ class AlexaAssistant {
         this.isSpeaking = false;
         this.recognition = null;
         this.wakeWord = "alexa";
-        this.isProcessingCommand = false;
-        this.currentUtterance = null;
-        this.audioContext = null;
-        this.originalVolume = 1;
-        this.mediaElements = [];
         
         this.toggleAlexa = this.toggleAlexa.bind(this);
         this.setupRecognition = this.setupRecognition.bind(this);
@@ -20,182 +15,8 @@ class AlexaAssistant {
     
     initialize() {
         console.log('Inicializando Alexa Assistant...');
-        this.initAudioContext();
         this.setupRecognition();
         this.setupButton();
-    }
-    
-    initAudioContext() {
-        try {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            console.log('✅ AudioContext inicializado para sonidos Alexa');
-        } catch (error) {
-            console.warn('⚠️ AudioContext no disponible:', error);
-        }
-    }
-    
-    // 🔊 SONIDO: Wake word detectado
-    playWakeWordSound() {
-        if (!this.audioContext) return;
-        
-        try {
-            const oscillator = this.audioContext.createOscillator();
-            const gainNode = this.audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-            
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
-            
-            oscillator.start();
-            oscillator.stop(this.audioContext.currentTime + 0.3);
-            
-            console.log('🔊 Sonido wake word');
-        } catch (error) {
-            console.warn('Error sonido wake word:', error);
-        }
-    }
-    
-    // 🔊 SONIDO: Comando detectado
-    playCommandDetectedSound() {
-        if (!this.audioContext) return;
-        
-        try {
-            const oscillator = this.audioContext.createOscillator();
-            const gainNode = this.audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-            
-            oscillator.frequency.value = 1200;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.15, this.audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
-            
-            oscillator.start();
-            oscillator.stop(this.audioContext.currentTime + 0.2);
-            
-            console.log('🔊 Sonido comando detectado');
-        } catch (error) {
-            console.warn('Error sonido comando:', error);
-        }
-    }
-    
-    // 🔊 SONIDO: Alexa está escuchando (después de wake word)
-    playListeningSound() {
-        if (!this.audioContext) return;
-        
-        try {
-            // Doble tono ascendente
-            for (let i = 0; i < 2; i++) {
-                const oscillator = this.audioContext.createOscillator();
-                const gainNode = this.audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(this.audioContext.destination);
-                
-                oscillator.frequency.value = 600 + (i * 200);
-                oscillator.type = 'sine';
-                
-                const startTime = this.audioContext.currentTime + (i * 0.1);
-                
-                gainNode.gain.setValueAtTime(0, startTime);
-                gainNode.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
-                
-                oscillator.start(startTime);
-                oscillator.stop(startTime + 0.2);
-            }
-            
-            console.log('🔊 Sonido de escucha activado');
-        } catch (error) {
-            console.warn('Error sonido escucha:', error);
-        }
-    }
-    
-    // 🔊 SONIDO: Stop o cancelar
-    playStopSound() {
-        if (!this.audioContext) return;
-        
-        try {
-            const oscillator = this.audioContext.createOscillator();
-            const gainNode = this.audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-            
-            oscillator.frequency.value = 400;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.4);
-            
-            oscillator.start();
-            oscillator.stop(this.audioContext.currentTime + 0.4);
-            
-            console.log('🔊 Sonido de stop');
-        } catch (error) {
-            console.warn('Error sonido stop:', error);
-        }
-    }
-    
-    // 🔊 SONIDO: Esperando wake word (muy suave)
-    playWaitingSound() {
-        if (!this.audioContext) return;
-        
-        try {
-            const oscillator = this.audioContext.createOscillator();
-            const gainNode = this.audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(this.audioContext.destination);
-            
-            oscillator.frequency.value = 500;
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.05, this.audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.1);
-            
-            oscillator.start();
-            oscillator.stop(this.audioContext.currentTime + 0.1);
-        } catch (error) {
-            // Ignorar error
-        }
-    }
-    
-    // 🔉 BAJAR volumen de medios para escuchar mejor
-    lowerVolumeForListening() {
-        this.mediaElements = document.querySelectorAll('audio, video');
-        this.originalVolume = 1;
-        
-        this.mediaElements.forEach(element => {
-            if (!element.muted && element.volume > 0) {
-                this.originalVolume = element.volume;
-                element.volume = 0.2; // Bajar a 20%
-            }
-        });
-        
-        // También pausar síntesis de voz si está hablando
-        if (window.speechSynthesis && window.speechSynthesis.speaking) {
-            window.speechSynthesis.pause();
-        }
-    }
-    
-    // 🔊 RESTAURAR volumen original
-    restoreVolume() {
-        this.mediaElements.forEach(element => {
-            element.volume = this.originalVolume;
-        });
-        
-        // Reanudar síntesis de voz si estaba pausada
-        if (window.speechSynthesis && window.speechSynthesis.paused) {
-            window.speechSynthesis.resume();
-        }
     }
     
     setupRecognition() {
@@ -209,17 +30,11 @@ class AlexaAssistant {
             this.recognition.onstart = () => {
                 console.log('🎤 Escuchando...');
                 this.showStatusIndicator('Escuchando...', true);
-                
-                // 🔊 SONIDO: Indicar que está escuchando ACTIVAMENTE
-                this.playListeningSound();
             };
             
             this.recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript.toLowerCase().trim();
                 console.log('Escuché:', transcript);
-                
-                // 🔊 SONIDO: Confirmación de que captó audio
-                this.playCommandDetectedSound();
                 
                 if (this.isListeningForWakeWord) {
                     if (transcript.startsWith(this.wakeWord + ' ') || 
@@ -228,8 +43,6 @@ class AlexaAssistant {
                         transcript.startsWith(this.wakeWord + '.')) {
                         
                         console.log('✅ Alexa detectada');
-                        // 🔊 SONIDO: Wake word detectado
-                        this.playWakeWordSound();
                         this.processAlexaCommand(transcript);
                     }
                 }
@@ -246,7 +59,7 @@ class AlexaAssistant {
             };
             
             this.recognition.onend = () => {
-                if (this.isActive && this.isListeningForWakeWord && !this.isProcessingCommand) {
+                if (this.isActive && this.isListeningForWakeWord) {
                     setTimeout(() => this.startListening(), 500);
                 }
             };
@@ -285,16 +98,11 @@ class AlexaAssistant {
             this.stopListening();
             this.hideStatusIndicator();
             this.stopSpeakingCompletely();
-            this.restoreVolume(); // Restaurar volumen al desactivar
         }
     }
     
     processAlexaCommand(transcript) {
         console.log('Procesando comando Alexa:', transcript);
-        this.isProcessingCommand = true;
-        
-        // 🔉 BAJAR VOLUMEN para escuchar mejor el comando
-        this.lowerVolumeForListening();
         
         let command = '';
         
@@ -312,8 +120,6 @@ class AlexaAssistant {
         
         if (this.isStopCommand(command)) {
             console.log('🚫 COMANDO DE DETENER DETECTADO');
-            // 🔊 SONIDO: Stop
-            this.playStopSound();
             this.executeStopCommand();
             return;
         }
@@ -355,12 +161,8 @@ class AlexaAssistant {
         this.stopSpeakingCompletely();
         this.showVisualConfirmation('🛑 Detenido');
         
-        // 🔊 RESTAURAR VOLUMEN después de stop
-        this.restoreVolume();
-        
         setTimeout(() => {
             this.showStatusIndicator('Di "Alexa" para activarme', false);
-            this.isProcessingCommand = false;
         }, 1500);
         
         return;
@@ -389,7 +191,6 @@ class AlexaAssistant {
         }
         
         this.isSpeaking = false;
-        this.isProcessingCommand = false;
     }
     
     // MODIFICADA: Ahora muestra en el panel
@@ -492,19 +293,12 @@ class AlexaAssistant {
     speakResponse(text) {
         console.log('Alexa va a hablar:', text);
         this.isSpeaking = true;
-        this.isProcessingCommand = true;
-        
-        // 🔊 RESTAURAR VOLUMEN antes de hablar
-        this.restoreVolume();
         
         if (typeof speakResponse === 'function') {
-            // Interceptar la función speakResponse para manejar interrupciones
-            this.setupSpeechInterruption();
             speakResponse(text);
             
             setTimeout(() => {
                 this.isSpeaking = false;
-                this.isProcessingCommand = false;
                 if (this.isActive) {
                     this.showStatusIndicator('Di "Alexa" para activarme', false);
                 }
@@ -518,60 +312,10 @@ class AlexaAssistant {
         }
     }
     
-    setupSpeechInterruption() {
-        // Guardar referencia a la función original
-        const originalSpeak = window.speechSynthesis.speak;
-        const self = this;
-        
-        // Sobrescribir temporalmente
-        window.speechSynthesis.speak = function(utterance) {
-            self.currentUtterance = utterance;
-            
-            // Configurar eventos para detectar interrupciones
-            utterance.onstart = function() {
-                console.log('Alexa empezó a hablar');
-                self.isSpeaking = true;
-                
-                // Preparar para interrupciones: iniciar escucha después de 1 segundo
-                setTimeout(() => {
-                    if (self.isActive && self.isListeningForWakeWord) {
-                        self.startListening();
-                    }
-                }, 1000);
-            };
-            
-            utterance.onend = function() {
-                console.log('Alexa terminó de hablar');
-                self.isSpeaking = false;
-                self.isProcessingCommand = false;
-                
-                // Restaurar función original
-                window.speechSynthesis.speak = originalSpeak;
-            };
-            
-            utterance.onerror = function(event) {
-                console.log('Error al hablar:', event);
-                self.isSpeaking = false;
-                self.isProcessingCommand = false;
-                window.speechSynthesis.speak = originalSpeak;
-            };
-            
-            // Llamar a la función original
-            return originalSpeak.call(this, utterance);
-        };
-    }
-    
     startListening() {
-        if (this.recognition && this.isActive && !this.isProcessingCommand) {
+        if (this.recognition && this.isActive) {
             try {
                 this.recognition.start();
-                
-                // Pequeño sonido de espera (muy suave)
-                setTimeout(() => {
-                    if (this.isActive && this.isListeningForWakeWord && !this.isSpeaking) {
-                        this.playWaitingSound();
-                    }
-                }, 300);
             } catch (error) {
                 setTimeout(() => this.startListening(), 1000);
             }
@@ -660,6 +404,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         const assistant = new AlexaAssistant();
         window.alexaAssistant = assistant;
-        console.log('✅ Alexa Assistant listo - Indicador en panel - Con sonidos');
+        console.log('✅ Alexa Assistant listo - Indicador en panel');
     }, 1000);
 });
