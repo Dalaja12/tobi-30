@@ -1,487 +1,486 @@
-// Alexa Assistant - Versión compatible con móviles
+// Alexa Assistant - Versión ULTRA compatible con móviles
 class AlexaAssistant {
     constructor() {
         this.isActive = false;
-        this.isListening = false; // Cambiado a false inicialmente
+        this.isListening = false;
         this.isSpeaking = false;
         this.recognition = null;
         this.wakeWord = "alexa";
         this.currentUtterance = null;
-        this.isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        this.isMobile = this.detectMobile();
+        this.activationMode = this.isMobile ? 'button' : 'wakeword'; // Modos diferentes
+        
+        console.log('Dispositivo: ' + (this.isMobile ? 'Móvil' : 'PC'));
+        console.log('Modo: ' + this.activationMode);
         
         this.toggleAlexa = this.toggleAlexa.bind(this);
         this.setupRecognition = this.setupRecognition.bind(this);
-        this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+        this.handleButtonActivation = this.handleButtonActivation.bind(this);
         
         setTimeout(() => this.initialize(), 100);
     }
     
+    detectMobile() {
+        return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+    
     initialize() {
-        console.log('Inicializando Alexa Assistant (Móvil: ' + this.isMobile + ')...');
+        console.log('Inicializando Alexa Assistant...');
         this.setupRecognition();
-        this.setupButton();
-        this.setupVisibilityListener();
+        this.setupUI();
+        this.setupEventListeners();
     }
     
     setupRecognition() {
+        // Verificar compatibilidad
         if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-            console.warn('Navegador no soporta reconocimiento de voz');
-            this.showStatusIndicator('❌ Voz no soportada', false, false);
+            console.warn('❌ Reconocimiento de voz no soportado');
+            this.showCompatibilityWarning();
             return;
         }
         
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         this.recognition = new SpeechRecognition();
         
-        // ⚠️ CONFIGURACIÓN PARA MÓVILES
+        // ⚠️ CONFIGURACIÓN ESPECÍFICA PARA MÓVILES
         if (this.isMobile) {
-            this.recognition.continuous = false; // ❗️ DESACTIVADO en móviles
+            // En móviles: modo simple y seguro
+            this.recognition.continuous = false;
             this.recognition.interimResults = false;
             this.recognition.maxAlternatives = 1;
-            
-            // Configuraciones específicas para móviles
-            this.recognition.onspeechstart = () => {
-                console.log('🎤 Habla detectada en móvil');
-                this.showStatusIndicator('🎤 Escuchando...', true);
-            };
+            this.recognition.lang = 'es-ES';
         } else {
-            // Configuración original para PC
+            // En PC: modo avanzado
             this.recognition.continuous = true;
             this.recognition.interimResults = false;
             this.recognition.maxAlternatives = 1;
+            this.recognition.lang = 'es-ES';
         }
         
-        this.recognition.lang = 'es-ES';
-        
+        // Eventos comunes
         this.recognition.onstart = () => {
-            console.log('🎤 Reconocimiento iniciado');
+            console.log('🎤 Reconocimiento INICIADO');
             this.showStatusIndicator('🎤 Escuchando...', true);
+            this.showListeningAnimation();
         };
         
         this.recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript.toLowerCase().trim();
-            console.log('Escuché:', transcript);
+            console.log('📝 Transcrito:', transcript);
             
-            // Detectar palabra de activación
-            if (this.isActive && transcript.includes(this.wakeWord)) {
-                console.log('✅ "' + this.wakeWord + '" detectado');
-                this.playBeep(800, 0.2);
-                
-                // Detener si está hablando
-                if (this.isSpeaking) {
-                    this.stopSpeakingCompletely();
+            this.showStatusIndicator('✅ Procesando...', false);
+            
+            // Diferente procesamiento según el modo
+            if (this.isMobile && this.activationMode === 'button') {
+                // En móviles con botón: procesar directamente
+                this.processMobileCommand(transcript);
+            } else {
+                // En PC o modo wakeword: buscar "alexa"
+                if (transcript.includes(this.wakeWord)) {
+                    this.playBeep(800, 0.2);
+                    const command = this.extractCommand(transcript);
+                    this.processAlexaCommand(command);
                 }
-                
-                // Procesar comando
-                this.processAlexaCommand(transcript);
-                
-                // En móviles, parar el reconocimiento después de procesar
-                if (this.isMobile) {
-                    setTimeout(() => {
-                        if (this.isActive) {
-                            this.restartListening();
-                        }
-                    }, 1000);
-                }
-            } else if (this.isActive && !transcript.includes(this.wakeWord)) {
-                console.log('No se detectó la palabra clave');
-                this.showStatusIndicator('Di "' + this.wakeWord + '"', false);
             }
         };
         
         this.recognition.onerror = (event) => {
-            console.log('Error reconocimiento:', event.error);
+            console.error('❌ Error:', event.error);
             
-            // Manejar errores comunes en móviles
-            if (event.error === 'no-speech') {
-                console.log('No se detectó voz');
-                this.showStatusIndicator('Di "' + this.wakeWord + '"', false);
-            } else if (event.error === 'audio-capture') {
-                console.log('Error de micrófono');
-                this.showStatusIndicator('🎤 Error micrófono', false, true);
+            switch(event.error) {
+                case 'not-allowed':
+                case 'permission-denied':
+                    this.showStatusIndicator('🎤 Permiso denegado', false, true);
+                    this.showPermissionInstructions();
+                    break;
+                case 'no-speech':
+                    this.showStatusIndicator('🎤 No escuché nada', false, true);
+                    break;
+                case 'audio-capture':
+                    this.showStatusIndicator('🎤 Error micrófono', false, true);
+                    break;
+                default:
+                    this.showStatusIndicator('❌ Error', false, true);
             }
             
-            // Reiniciar si hubo error
-            if (this.isActive) {
-                setTimeout(() => this.restartListening(), 1000);
-            }
+            // Reiniciar después de error
+            setTimeout(() => {
+                if (this.isActive) {
+                    this.cleanupRecognition();
+                    this.setupRecognition();
+                }
+            }, 2000);
         };
         
         this.recognition.onend = () => {
-            console.log('Reconocimiento terminado');
+            console.log('🔚 Reconocimiento FINALIZADO');
             
-            // ⚠️ COMPORTAMIENTO DIFERENTE PARA MÓVILES
             if (this.isMobile) {
-                // En móviles, NO reiniciamos automáticamente el reconocimiento continuo
-                // En su lugar, solo reiniciamos si está activo y no estamos hablando
+                // En móviles: limpiar y preparar para siguiente uso
+                this.hideListeningAnimation();
+                
                 if (this.isActive && !this.isSpeaking) {
-                    // Pequeño delay antes de reiniciar
-                    setTimeout(() => {
-                        if (this.isActive && !this.isSpeaking) {
-                            this.startListening();
-                        }
-                    }, 2000); // Delay más largo en móviles
+                    // Solo mantener activo si el usuario lo decidió
+                    this.showStatusIndicator('Listo', false);
+                } else {
+                    this.showStatusIndicator('Inactivo', false, false);
                 }
             } else {
-                // Para PC: reiniciar siempre si está activo
-                if (this.isActive) {
+                // En PC: reiniciar automáticamente
+                if (this.isActive && !this.isSpeaking) {
                     setTimeout(() => {
                         try {
-                            this.recognition.start();
+                            if (this.recognition) {
+                                this.recognition.start();
+                            }
                         } catch (e) {
-                            setTimeout(() => this.startListening(), 1000);
+                            console.log('Error reiniciando:', e);
                         }
-                    }, 100);
+                    }, 500);
                 }
             }
         };
     }
     
-    // 🔊 SONIDOS (optimizados para móviles)
-    playBeep(freq, duration) {
-        try {
-            // Usar AudioContext si está disponible
-            if (window.AudioContext || window.webkitAudioContext) {
-                const AudioContext = window.AudioContext || window.webkitAudioContext;
-                const audioContext = new AudioContext();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.value = freq;
-                oscillator.type = 'sine';
-                gainNode.gain.value = 0.1;
-                
-                oscillator.start();
-                oscillator.stop(audioContext.currentTime + duration);
-                
-                // Cerrar contexto después de usar (importante para móviles)
-                setTimeout(() => {
-                    audioContext.close();
-                }, duration * 2000);
-            } else {
-                // Fallback simple para móviles antiguos
-                const audio = new Audio();
-                audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ';
-                audio.volume = 0.1;
-                audio.play().catch(e => console.log('Error sonido:', e));
-            }
-        } catch (e) {
-            console.log('No se pudo reproducir sonido:', e);
+    setupUI() {
+        // Crear interfaz especial para móviles
+        if (this.isMobile) {
+            this.createMobileUI();
         }
-    }
-    
-    setupButton() {
+        
+        // Configurar botón principal
         const alexaBtn = document.getElementById('alexaBtn');
         if (alexaBtn) {
-            // Limpiar eventos anteriores
-            alexaBtn.removeEventListener('click', this.toggleAlexa);
             alexaBtn.addEventListener('click', this.toggleAlexa);
             
-            // Añadir evento táctil para mejor respuesta en móviles
-            alexaBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
+            // Mejorar feedback táctil
+            alexaBtn.addEventListener('touchstart', () => {
                 alexaBtn.classList.add('touch-active');
             });
             
-            alexaBtn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                alexaBtn.classList.remove('touch-active');
+            alexaBtn.addEventListener('touchend', () => {
+                setTimeout(() => {
+                    alexaBtn.classList.remove('touch-active');
+                }, 200);
             });
         }
     }
     
-    // Manejar cambios de visibilidad (pestaña/ventana)
-    setupVisibilityListener() {
-        document.addEventListener('visibilitychange', this.handleVisibilityChange);
-    }
-    
-    handleVisibilityChange() {
-        if (document.hidden) {
-            // Página no visible - detener reconocimiento para ahorrar batería
-            if (this.isActive) {
-                console.log('Página oculta - deteniendo reconocimiento');
-                this.stopListening();
-            }
-        } else {
-            // Página visible nuevamente - reiniciar si estaba activo
-            if (this.isActive) {
-                console.log('Página visible - reiniciando reconocimiento');
-                setTimeout(() => this.restartListening(), 500);
-            }
+    createMobileUI() {
+        // Crear botón flotante para móviles
+        if (!document.getElementById('mobileAlexaBtn')) {
+            const mobileBtn = document.createElement('button');
+            mobileBtn.id = 'mobileAlexaBtn';
+            mobileBtn.innerHTML = '🎤';
+            mobileBtn.title = 'Pulsa y habla';
+            mobileBtn.style.cssText = `
+                position: fixed;
+                bottom: 100px;
+                right: 20px;
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border: none;
+                color: white;
+                font-size: 24px;
+                cursor: pointer;
+                z-index: 10000;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s;
+                user-select: none;
+            `;
+            
+            document.body.appendChild(mobileBtn);
+            
+            // Eventos para el botón móvil
+            mobileBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.handleButtonActivation(true);
+                mobileBtn.style.transform = 'scale(0.9)';
+                mobileBtn.style.background = 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)';
+            });
+            
+            mobileBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                this.handleButtonActivation(false);
+                mobileBtn.style.transform = 'scale(1)';
+                mobileBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            });
+            
+            mobileBtn.addEventListener('click', () => {
+                this.handleButtonActivation(true);
+                setTimeout(() => this.handleButtonActivation(false), 100);
+            });
         }
-    }
-    
-    toggleAlexa() {
-        const alexaBtn = document.getElementById('alexaBtn');
         
-        if (!this.isActive) {
-            // ACTIVAR
-            this.isActive = true;
-            this.isListening = true;
-            
-            alexaBtn.classList.add('active');
-            alexaBtn.innerHTML = '🎤';
-            
-            this.startListening();
-            this.showStatusIndicator('Di "Alexa"', false);
-            console.log('✅ Alexa ACTIVADA');
-            
-        } else {
-            // DESACTIVAR
-            this.isActive = false;
-            this.isListening = false;
-            
-            alexaBtn.classList.remove('active');
-            alexaBtn.innerHTML = '🤖';
-            
-            this.stopListening();
-            this.hideStatusIndicator();
-            this.stopSpeakingCompletely();
-            console.log('⏸️ Alexa DESACTIVADA');
+        // Crear overlay de escucha para móviles
+        if (!document.getElementById('mobileListeningOverlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'mobileListeningOverlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: none;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                z-index: 9999;
+                color: white;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 24px;
+                text-align: center;
+            `;
+            overlay.innerHTML = `
+                <div style="
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50%;
+                    background: rgba(0, 255, 255, 0.2);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 20px;
+                    animation: pulse 1.5s infinite;
+                ">
+                    <div style="
+                        width: 60px;
+                        height: 60px;
+                        border-radius: 50%;
+                        background: rgba(0, 255, 255, 0.5);
+                    "></div>
+                </div>
+                <p>🎤 Habla ahora...</p>
+                <p style="font-size: 16px; margin-top: 10px; color: #0ff;">Di "para" para cancelar</p>
+            `;
+            document.body.appendChild(overlay);
         }
     }
     
-    // Método optimizado para móviles
-    startListening() {
-        if (!this.recognition) {
-            console.error('Reconocimiento no inicializado');
+    setupEventListeners() {
+        // Detectar orientación del dispositivo
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.adjustMobileUI(), 300);
+        });
+        
+        // Pausar cuando la página no está visible
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.isActive) {
+                this.pauseAssistant();
+            }
+        });
+        
+        // Pausar cuando se pierde el foco
+        window.addEventListener('blur', () => {
+            if (this.isActive) {
+                this.pauseAssistant();
+            }
+        });
+        
+        // Reanudar cuando se recupera el foco
+        window.addEventListener('focus', () => {
+            if (this.isActive && !this.isSpeaking) {
+                setTimeout(() => this.resumeAssistant(), 1000);
+            }
+        });
+    }
+    
+    handleButtonActivation(start) {
+        if (!this.isActive) {
+            this.showStatusIndicator('❌ Alexa no activada', false, true);
             return;
         }
         
-        if (!this.isActive || this.isSpeaking) return;
-        
-        try {
-            // En móviles, verificar permisos primero
-            if (this.isMobile) {
-                this.requestMicrophonePermission().then(hasPermission => {
-                    if (hasPermission && this.isActive) {
-                        this.recognition.start();
-                    }
-                }).catch(error => {
-                    console.error('Error permisos:', error);
-                    this.showStatusIndicator('🎤 Sin permisos', false, true);
-                });
-            } else {
-                this.recognition.start();
-            }
-        } catch (error) {
-            console.error('Error iniciando reconocimiento:', error);
-            // Intentar nuevamente después de un delay
-            setTimeout(() => {
-                if (this.isActive) {
-                    this.startListening();
-                }
-            }, 1000);
+        if (start) {
+            console.log('📱 Botón pulsado - ESCUCHANDO');
+            this.showMobileListeningUI();
+            this.startListeningSession();
+        } else {
+            console.log('📱 Botón soltado - PROCESANDO');
+            // El procesamiento se hace en onresult
         }
     }
     
-    // Solicitar permiso de micrófono (especial para móviles)
-    async requestMicrophonePermission() {
+    startListeningSession() {
+        if (!this.recognition) {
+            this.setupRecognition();
+        }
+        
+        // Solicitar permisos explícitamente en móviles
+        if (this.isMobile) {
+            this.requestMicrophoneAccess().then(granted => {
+                if (granted) {
+                    this.startRecognition();
+                }
+            });
+        } else {
+            this.startRecognition();
+        }
+    }
+    
+    async requestMicrophoneAccess() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             return false;
         }
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: true,
-                video: false 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
             });
             
-            // Detener stream inmediatamente (solo necesitamos el permiso)
+            // Detener stream inmediatamente (solo necesitamos permisos)
             stream.getTracks().forEach(track => track.stop());
             return true;
             
         } catch (error) {
-            console.error('Permiso de micrófono denegado:', error);
+            console.error('Error permisos:', error);
             
-            // Mostrar mensaje amigable
             if (error.name === 'NotAllowedError') {
-                this.showStatusIndicator('🎤 Permiso denegado', false, true);
-                alert('Por favor, permite el acceso al micrófono en la configuración del navegador para usar Alexa.');
+                this.showPermissionDialog();
             }
             
             return false;
         }
     }
     
-    stopListening() {
-        if (this.recognition) {
-            try {
-                this.recognition.stop();
-            } catch (error) {
-                console.log('Error deteniendo reconocimiento:', error);
+    startRecognition() {
+        try {
+            if (this.recognition && !this.isSpeaking) {
+                this.recognition.start();
             }
-        }
-    }
-    
-    // Reiniciar escucha (método seguro)
-    restartListening() {
-        if (!this.isActive || this.isSpeaking) return;
-        
-        this.stopListening();
-        
-        // Delay antes de reiniciar
-        setTimeout(() => {
-            if (this.isActive && !this.isSpeaking) {
-                this.startListening();
-            }
-        }, this.isMobile ? 3000 : 1000); // Delay más largo en móviles
-    }
-    
-    processAlexaCommand(transcript) {
-        console.log('Procesando comando:', transcript);
-        
-        let command = '';
-        
-        // Extraer comando después de "alexa"
-        const alexaIndex = transcript.indexOf(this.wakeWord);
-        if (alexaIndex !== -1) {
-            command = transcript.substring(alexaIndex + this.wakeWord.length).trim();
-        }
-        
-        // Limpiar puntuación
-        command = command.replace(/[.,!?]/g, '').trim();
-        
-        console.log('Comando limpio:', command);
-        
-        // Comandos de detener (funcionan inmediatamente)
-        if (this.isStopCommand(command)) {
-            console.log('🚫 Comando DETENER detectado');
-            this.playBeep(400, 0.3);
-            this.stopSpeakingCompletely();
-            this.showStatusIndicator('🛑 Detenido', false, true);
+        } catch (error) {
+            console.error('Error iniciando reconocimiento:', error);
             
+            // Intentar recrear el reconocimiento
             setTimeout(() => {
+                this.cleanupRecognition();
+                this.setupRecognition();
+                
                 if (this.isActive) {
-                    this.showStatusIndicator('Di "Alexa"', false);
-                    this.restartListening();
+                    setTimeout(() => this.startRecognition(), 1000);
                 }
-            }, 1500);
+            }, 1000);
+        }
+    }
+    
+    processMobileCommand(command) {
+        console.log('📱 Comando móvil:', command);
+        
+        // Comandos de control inmediato
+        if (this.isStopCommand(command)) {
+            this.handleStopCommand();
             return;
         }
         
-        // Comando vacío o solo "alexa"
+        // Comandos especiales para móviles
+        if (command.includes('activar') || command.includes('encender')) {
+            if (!this.isActive) {
+                this.toggleAlexa();
+                this.speakResponse('Alexa activada');
+            }
+            return;
+        }
+        
+        if (command.includes('desactivar') || command.includes('apagar')) {
+            if (this.isActive) {
+                this.toggleAlexa();
+            }
+            return;
+        }
+        
+        // Procesar como pregunta normal
+        this.processAlexaCommand(command);
+    }
+    
+    handleStopCommand() {
+        this.playBeep(400, 0.3);
+        this.stopSpeakingCompletely();
+        this.hideMobileListeningUI();
+        this.showStatusIndicator('🛑 Detenido', false, true);
+        
+        setTimeout(() => {
+            if (this.isActive) {
+                this.showStatusIndicator('Listo', false);
+            }
+        }, 1500);
+    }
+    
+    processAlexaCommand(command) {
+        console.log('Procesando comando:', command);
+        
         if (!command) {
-            this.speakResponse('¿Sí? ¿En qué puedo ayudarte?');
+            this.speakResponse('¿En qué puedo ayudarte?');
             return;
         }
         
-        // Procesar pregunta
-        this.processQuestion(command);
-    }
-    
-    isStopCommand(command) {
-        const stopCommands = [
-            'para', 'detente', 'cállate', 'callate', 'silencio', 'basta',
-            'alto', 'cancela', 'cancelar', 'para ya', 'detén', 'quieto',
-            'deja de hablar', 'calla', 'cierra el pico', 'basta ya',
-            'para ahora', 'detente ahora', 'cállate ya', 'no hables'
-        ];
-        
-        return stopCommands.some(stopWord => 
-            command === stopWord || command.startsWith(stopWord + ' ')
-        );
-    }
-    
-    stopSpeakingCompletely() {
-        console.log('🔇 Deteniendo habla...');
-        
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-        }
-        
-        // Detener animación de boca
-        const mouth = document.getElementById('mouth');
-        if (mouth) {
-            mouth.classList.remove('surprised');
-            mouth.classList.add('happy');
-        }
-        
-        this.isSpeaking = false;
-        this.currentUtterance = null;
-    }
-    
-    processQuestion(question) {
-        console.log('Procesando pregunta:', question);
-        
-        // Mostrar que estamos procesando
-        this.showStatusIndicator('🤔 Procesando...', false);
+        this.showStatusIndicator('🤔 Buscando...', false);
         
         // Buscar respuesta
-        this.searchForAlexa(question);
+        this.searchForAlexa(command);
     }
     
     async searchForAlexa(query) {
-        console.log('Buscando:', query);
-        
-        // Intentar respuesta predefinida primero
-        if (typeof getPredefinedResponse === 'function') {
-            const response = getPredefinedResponse(query);
-            if (response) {
-                let responseText = '';
-                
-                if (typeof response === 'object' && response.action) {
-                    responseText = response.text;
+        try {
+            // Buscar respuesta predefinida
+            if (typeof getPredefinedResponse === 'function') {
+                const response = getPredefinedResponse(query);
+                if (response) {
+                    const responseText = typeof response === 'object' ? response.text : response;
                     this.speakResponse(responseText);
                     
-                    // Ejecutar acción después de hablar
-                    setTimeout(() => {
-                        if (response.action) {
-                            response.action();
-                        }
-                    }, 1000);
-                } else {
-                    responseText = response;
-                    this.speakResponse(responseText);
+                    if (typeof response === 'object' && response.action) {
+                        setTimeout(() => response.action(), 1000);
+                    }
+                    return;
                 }
-                return;
             }
-        }
-        
-        // Si no hay respuesta predefinida, usar búsqueda web
-        if (typeof searchWeb === 'function') {
-            try {
-                await this.captureSearchWebResponse(query);
-            } catch (error) {
-                console.error('Error en búsqueda:', error);
-                this.speakResponse('No pude encontrar información sobre eso.');
+            
+            // Usar búsqueda web si está disponible
+            if (typeof searchWeb === 'function') {
+                const answer = await this.captureWebSearch(query);
+                if (answer) {
+                    this.speakResponse(answer);
+                } else {
+                    this.speakResponse('No encontré información sobre eso.');
+                }
+            } else {
+                this.speakResponse('No puedo buscar información ahora.');
             }
-        } else {
-            this.speakResponse('Lo siento, no puedo buscar información en este momento.');
+            
+        } catch (error) {
+            console.error('Error buscando:', error);
+            this.speakResponse('Hubo un error al procesar tu pregunta.');
         }
     }
     
-    async captureSearchWebResponse(query) {
+    async captureWebSearch(query) {
         return new Promise((resolve) => {
-            // Guardar funciones originales
-            const originalAddMessage = window.addMessage;
-            let responseCaptured = false;
+            let captured = false;
+            const timeout = 8000; // 8 segundos máximo
             
-            // Interceptar mensajes
+            // Interceptar mensajes del bot
+            const originalAddMessage = window.addMessage;
+            
             window.addMessage = (text, sender) => {
-                if (sender === 'bot' && !responseCaptured) {
-                    const cleanText = this.removeEmojis(text);
-                    
-                    // Filtrar mensajes de sistema
-                    if (cleanText.length > 10 && 
-                        !cleanText.includes('Buscando') && 
-                        !cleanText.includes('Cargando') &&
-                        !cleanText.includes('Hola! Soy CyberPet')) {
-                        
-                        responseCaptured = true;
-                        this.speakResponse(cleanText);
-                        
-                        // Restaurar función original
-                        window.addMessage = originalAddMessage;
-                        resolve();
-                        return;
+                if (sender === 'bot' && !captured) {
+                    const cleanText = this.cleanResponse(text);
+                    if (cleanText && cleanText.length > 10) {
+                        captured = true;
+                        resolve(cleanText);
                     }
                 }
                 
-                // Pasar a función original si existe
                 if (originalAddMessage) {
                     originalAddMessage(text, sender);
                 }
@@ -490,129 +489,321 @@ class AlexaAssistant {
             // Ejecutar búsqueda
             try {
                 searchWeb(query);
-                
-                // Timeout por seguridad
-                setTimeout(() => {
-                    if (!responseCaptured) {
-                        window.addMessage = originalAddMessage;
-                        this.speakResponse('No encontré información sobre eso.');
-                        resolve();
-                    }
-                }, 8000);
-                
             } catch (error) {
-                window.addMessage = originalAddMessage;
-                this.speakResponse('Hubo un error al buscar.');
-                resolve();
+                console.error('Error en búsqueda:', error);
+                resolve(null);
             }
+            
+            // Timeout
+            setTimeout(() => {
+                if (!captured) {
+                    window.addMessage = originalAddMessage;
+                    resolve(null);
+                }
+            }, timeout);
         });
     }
     
-    removeEmojis(str) {
-        return str.replace(/[\p{Extended_Pictographic}]/gu, '').trim();
+    cleanResponse(text) {
+        // Limpiar texto de respuesta
+        return text
+            .replace(/[\p{Extended_Pictographic}]/gu, '')
+            .replace(/\[.*?\]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+    
+    extractCommand(transcript) {
+        const index = transcript.indexOf(this.wakeWord);
+        if (index !== -1) {
+            return transcript.substring(index + this.wakeWord.length).trim();
+        }
+        return transcript;
     }
     
     speakResponse(text) {
-        console.log('Hablando:', text.substring(0, 50) + '...');
-        
         if (!window.speechSynthesis) {
             console.error('Síntesis de voz no disponible');
-            this.showStatusIndicator('🗣️ Voz no disponible', false, true);
             return;
         }
         
-        this.isSpeaking = true;
-        const cleanText = this.removeEmojis(text);
-        
-        // Detener cualquier habla previa
+        // Limpiar síntesis previa
         window.speechSynthesis.cancel();
+        
+        const cleanText = this.cleanResponse(text);
+        if (!cleanText) return;
+        
+        this.isSpeaking = true;
+        this.hideMobileListeningUI();
         
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'es-ES';
         utterance.rate = 0.85;
         utterance.pitch = 0.9;
-        utterance.volume = 1.0;
         
-        // Configurar eventos
         utterance.onstart = () => {
             console.log('🗣️ Empezó a hablar');
             this.showStatusIndicator('🗣️ Hablando...', false);
-            
-            // Animación de boca
-            const mouth = document.getElementById('mouth');
-            if (mouth) {
-                this.talkInterval = setInterval(() => {
-                    mouth.classList.toggle('surprised');
-                }, 200);
-            }
-            
-            // Detener reconocimiento mientras habla
-            this.stopListening();
+            this.showTalkingAnimation();
         };
         
         utterance.onend = () => {
             console.log('✅ Terminó de hablar');
             this.isSpeaking = false;
+            this.hideTalkingAnimation();
             
-            // Detener animación
-            if (this.talkInterval) {
-                clearInterval(this.talkInterval);
-            }
-            
-            const mouth = document.getElementById('mouth');
-            if (mouth) {
-                mouth.classList.remove('surprised');
-                mouth.classList.add('happy');
-            }
-            
-            // Reiniciar reconocimiento si está activo
             if (this.isActive) {
-                setTimeout(() => {
-                    this.showStatusIndicator('Di "Alexa"', false);
-                    this.restartListening();
-                }, 500);
+                this.showStatusIndicator('Listo', false);
+                
+                // En móviles, mostrar instrucción
+                if (this.isMobile) {
+                    this.showMobileReadyIndicator();
+                }
             }
         };
         
         utterance.onerror = (event) => {
-            console.error('Error al hablar:', event);
+            console.error('Error hablando:', event);
             this.isSpeaking = false;
+            this.hideTalkingAnimation();
             
-            if (this.talkInterval) {
-                clearInterval(this.talkInterval);
-            }
-            
-            const mouth = document.getElementById('mouth');
-            if (mouth) {
-                mouth.classList.remove('surprised');
-                mouth.classList.add('happy');
-            }
-            
-            // Reiniciar si hay error
             if (this.isActive) {
-                setTimeout(() => {
-                    this.showStatusIndicator('Di "Alexa"', false);
-                    this.restartListening();
-                }, 1000);
+                this.showStatusIndicator('Error', false, true);
             }
         };
         
-        // Hablar
         window.speechSynthesis.speak(utterance);
     }
     
-    showStatusIndicator(text, isListening = false, isError = false) {
+    // ===== MÉTODOS DE UI PARA MÓVILES =====
+    
+    showMobileListeningUI() {
+        const overlay = document.getElementById('mobileListeningOverlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+            
+            // Auto-ocultar después de 10 segundos
+            setTimeout(() => {
+                if (overlay.style.display === 'flex') {
+                    this.hideMobileListeningUI();
+                    this.showStatusIndicator('⏱️ Tiempo agotado', false, true);
+                }
+            }, 10000);
+        }
+    }
+    
+    hideMobileListeningUI() {
+        const overlay = document.getElementById('mobileListeningOverlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+    
+    showMobileReadyIndicator() {
+        if (this.isMobile && this.isActive) {
+            const mobileBtn = document.getElementById('mobileAlexaBtn');
+            if (mobileBtn) {
+                mobileBtn.style.animation = 'pulse 2s infinite';
+                setTimeout(() => {
+                    mobileBtn.style.animation = '';
+                }, 3000);
+            }
+        }
+    }
+    
+    showListeningAnimation() {
+        const mouth = document.getElementById('mouth');
+        if (mouth) {
+            mouth.classList.add('listening');
+        }
+    }
+    
+    hideListeningAnimation() {
+        const mouth = document.getElementById('mouth');
+        if (mouth) {
+            mouth.classList.remove('listening');
+        }
+    }
+    
+    showTalkingAnimation() {
+        const mouth = document.getElementById('mouth');
+        if (mouth) {
+            mouth.classList.add('talking');
+            this.talkInterval = setInterval(() => {
+                mouth.classList.toggle('surprised');
+            }, 200);
+        }
+    }
+    
+    hideTalkingAnimation() {
+        const mouth = document.getElementById('mouth');
+        if (mouth) {
+            mouth.classList.remove('talking', 'surprised');
+            mouth.classList.add('happy');
+        }
+        
+        if (this.talkInterval) {
+            clearInterval(this.talkInterval);
+        }
+    }
+    
+    // ===== MÉTODOS DE CONTROL =====
+    
+    toggleAlexa() {
+        const alexaBtn = document.getElementById('alexaBtn');
+        
+        if (!this.isActive) {
+            // ACTIVAR
+            this.isActive = true;
+            alexaBtn.classList.add('active');
+            alexaBtn.innerHTML = '🎤';
+            
+            console.log('✅ Alexa ACTIVADA');
+            
+            if (this.isMobile) {
+                // En móviles: modo botón
+                this.showStatusIndicator('📱 Pulsa y habla', false);
+                this.showMobileInstructions();
+                
+                // Mostrar botón flotante
+                const mobileBtn = document.getElementById('mobileAlexaBtn');
+                if (mobileBtn) {
+                    mobileBtn.style.display = 'flex';
+                }
+                
+            } else {
+                // En PC: modo wakeword
+                this.showStatusIndicator('Di "Alexa"', false);
+                this.startRecognition();
+            }
+            
+        } else {
+            // DESACTIVAR
+            this.deactivate();
+        }
+    }
+    
+    deactivate() {
+        this.isActive = false;
+        this.isListening = false;
+        
+        const alexaBtn = document.getElementById('alexaBtn');
+        alexaBtn.classList.remove('active');
+        alexaBtn.innerHTML = '🤖';
+        
+        this.stopSpeakingCompletely();
+        this.cleanupRecognition();
+        this.hideMobileListeningUI();
+        this.hideStatusIndicator();
+        
+        // Ocultar botón flotante en móviles
+        if (this.isMobile) {
+            const mobileBtn = document.getElementById('mobileAlexaBtn');
+            if (mobileBtn) {
+                mobileBtn.style.display = 'none';
+            }
+        }
+        
+        console.log('⏸️ Alexa DESACTIVADA');
+    }
+    
+    pauseAssistant() {
+        if (this.isActive) {
+            console.log('⏸️ Asistente pausado');
+            this.stopListening();
+            this.showStatusIndicator('⏸️ Pausado', false);
+        }
+    }
+    
+    resumeAssistant() {
+        if (this.isActive && !this.isSpeaking) {
+            console.log('▶️ Asistente reanudado');
+            
+            if (this.isMobile) {
+                this.showStatusIndicator('📱 Pulsa y habla', false);
+            } else {
+                this.showStatusIndicator('Di "Alexa"', false);
+                this.startRecognition();
+            }
+        }
+    }
+    
+    cleanupRecognition() {
+        if (this.recognition) {
+            try {
+                this.recognition.stop();
+                this.recognition = null;
+            } catch (e) {
+                console.log('Error limpiando reconocimiento:', e);
+            }
+        }
+    }
+    
+    // ===== MÉTODOS DE UTILIDAD =====
+    
+    playBeep(freq, duration) {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = freq;
+            oscillator.type = 'sine';
+            gainNode.gain.value = 0.1;
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+            
+            setTimeout(() => audioContext.close(), duration * 2000);
+        } catch (e) {
+            // Fallback silencioso
+        }
+    }
+    
+    isStopCommand(command) {
+        const stopWords = ['para', 'detente', 'cállate', 'callate', 'silencio', 'basta', 'alto'];
+        return stopWords.some(word => command.includes(word));
+    }
+    
+    stopSpeakingCompletely() {
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+        this.hideTalkingAnimation();
+        this.isSpeaking = false;
+    }
+    
+    stopListening() {
+        if (this.recognition) {
+            try {
+                this.recognition.stop();
+            } catch (e) {
+                console.log('Error deteniendo:', e);
+            }
+        }
+    }
+    
+    showStatusIndicator(text, listening = false, error = false) {
         let container = document.getElementById('alexaStatusContainer');
         if (!container) {
-            // Crear contenedor si no existe
             container = document.createElement('div');
             container.id = 'alexaStatusContainer';
             container.style.cssText = `
                 margin: 10px 0;
-                padding: 8px;
+                padding: 8px 12px;
                 border-radius: 8px;
-                background: rgba(0, 0, 0, 0.3);
-                border: 1px solid var(--main-color, #0ff);
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid ${error ? '#f00' : '#0ff'};
+                font-family: 'Orbitron', sans-serif;
+                font-size: 14px;
+                color: white;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 40px;
             `;
             
             const statsPanel = document.getElementById('statsPanel');
@@ -621,33 +812,20 @@ class AlexaAssistant {
             }
         }
         
-        let indicator = document.getElementById('alexaStatus');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'alexaStatus';
-            indicator.className = 'alexa-status';
-            indicator.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                font-family: 'Orbitron', sans-serif;
-                font-size: 14px;
-            `;
-            container.appendChild(indicator);
-        }
+        const color = error ? '#f00' : listening ? '#0ff' : '#0f0';
+        const icon = listening ? '🎤' : error ? '❌' : '✅';
         
-        // Crear pulso visual
-        let pulse = '';
-        if (isListening) {
-            pulse = `<div style="width: 10px; height: 10px; background: #0ff; border-radius: 50%; animation: pulse 1s infinite;"></div>`;
-        } else if (isError) {
-            pulse = `<div style="width: 10px; height: 10px; background: #f00; border-radius: 50%;"></div>`;
-        } else {
-            pulse = `<div style="width: 10px; height: 10px; background: #0f0; border-radius: 50%;"></div>`;
-        }
-        
-        indicator.innerHTML = pulse + `<span style="color: ${isError ? '#f00' : '#fff'}">${text}</span>`;
-        container.style.display = 'block';
+        container.innerHTML = `
+            <div style="
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: ${color};
+                ${listening ? 'animation: pulse 1s infinite;' : ''}
+            "></div>
+            <span>${icon} ${text}</span>
+        `;
+        container.style.display = 'flex';
     }
     
     hideStatusIndicator() {
@@ -657,49 +835,151 @@ class AlexaAssistant {
         }
     }
     
-    // Limpiar recursos al cerrar
-    cleanup() {
-        this.stopListening();
-        this.stopSpeakingCompletely();
-        document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    showMobileInstructions() {
+        if (this.isMobile) {
+            const instructions = document.createElement('div');
+            instructions.id = 'mobileInstructions';
+            instructions.style.cssText = `
+                position: fixed;
+                bottom: 170px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.9);
+                color: white;
+                padding: 10px 15px;
+                border-radius: 10px;
+                font-family: 'Comic Neue', sans-serif;
+                font-size: 12px;
+                max-width: 200px;
+                border: 2px solid #0ff;
+                z-index: 9998;
+                animation: fadeIn 0.5s;
+            `;
+            instructions.innerHTML = `
+                <strong>📱 Modo móvil activado</strong><br>
+                • Pulsa el botón naranja<br>
+                • Habla tu pregunta<br>
+                • Suelta para procesar<br>
+                • Di "para" para cancelar
+            `;
+            document.body.appendChild(instructions);
+            
+            setTimeout(() => {
+                if (instructions.parentNode) {
+                    instructions.remove();
+                }
+            }, 5000);
+        }
+    }
+    
+    showPermissionDialog() {
+        if (this.isMobile) {
+            const dialog = document.createElement('div');
+            dialog.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.95);
+                color: white;
+                padding: 20px;
+                border-radius: 15px;
+                border: 3px solid #f00;
+                z-index: 10001;
+                text-align: center;
+                max-width: 80%;
+                font-family: 'Comic Neue', sans-serif;
+            `;
+            dialog.innerHTML = `
+                <h3 style="color: #f00">🎤 Permiso de micrófono</h3>
+                <p>Para usar Alexa en móvil:</p>
+                <ol style="text-align: left; margin: 15px 0;">
+                    <li>Abre configuración del navegador</li>
+                    <li>Ve a "Configuración del sitio"</li>
+                    <li>Permite "Micrófono" para esta página</li>
+                    <li>Recarga la página</li>
+                </ol>
+                <button onclick="this.parentNode.remove()" 
+                        style="background: #f00; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                    Entendido
+                </button>
+            `;
+            document.body.appendChild(dialog);
+        }
+    }
+    
+    showCompatibilityWarning() {
+        const warning = document.createElement('div');
+        warning.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 10000;
+            text-align: center;
+            max-width: 90%;
+            font-family: 'Comic Neue', sans-serif;
+        `;
+        warning.innerHTML = `
+            <strong>⚠️ Alexa no disponible</strong><br>
+            Tu navegador no soporta reconocimiento de voz.<br>
+            Prueba con <strong>Chrome</strong> o <strong>Edge</strong>.
+        `;
+        document.body.appendChild(warning);
+        
+        setTimeout(() => warning.remove(), 5000);
+    }
+    
+    adjustMobileUI() {
+        if (this.isMobile) {
+            const mobileBtn = document.getElementById('mobileAlexaBtn');
+            if (mobileBtn) {
+                // Ajustar posición según orientación
+                const isPortrait = window.innerHeight > window.innerWidth;
+                mobileBtn.style.bottom = isPortrait ? '100px' : '30px';
+                mobileBtn.style.right = isPortrait ? '20px' : '30px';
+            }
+        }
     }
 }
 
-// Inicializar cuando el DOM esté listo
+// Inicialización segura
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         try {
-            const assistant = new AlexaAssistant();
-            window.alexaAssistant = assistant;
-            console.log('✅ Alexa Assistant inicializado');
-            
-            // Limpiar al descargar la página
-            window.addEventListener('beforeunload', () => {
-                if (assistant.cleanup) {
-                    assistant.cleanup();
-                }
-            });
+            // Solo inicializar si hay botón Alexa
+            if (document.getElementById('alexaBtn')) {
+                window.alexaAssistant = new AlexaAssistant();
+                console.log('🚀 Alexa Assistant listo');
+            }
         } catch (error) {
             console.error('Error inicializando Alexa:', error);
         }
-    }, 1500);
+    }, 2000);
 });
 
-// Añadir estilos CSS necesarios
-if (!document.querySelector('#alexa-styles')) {
+// Añadir estilos necesarios
+if (!document.querySelector('#alexa-mobile-styles')) {
     const style = document.createElement('style');
-    style.id = 'alexa-styles';
+    style.id = 'alexa-mobile-styles';
     style.textContent = `
         @keyframes pulse {
-            0% { opacity: 0.5; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.2); }
-            100% { opacity: 0.5; transform: scale(0.8); }
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         #alexaBtn.active {
             background: #ff3366 !important;
             box-shadow: 0 0 20px #ff3366 !important;
-            animation: pulse 2s infinite;
         }
         
         #alexaBtn.touch-active {
@@ -707,30 +987,37 @@ if (!document.querySelector('#alexa-styles')) {
             transition: transform 0.1s;
         }
         
-        .alexa-pulse {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
+        /* Animaciones para la boca */
+        .mouth.listening {
+            animation: pulse 1.5s infinite;
+            background: #0ff !important;
         }
         
-        .alexa-pulse.listen {
-            background: #0ff;
-            animation: pulse 1s infinite;
+        .mouth.talking {
+            background: #ff0 !important;
         }
         
-        .alexa-pulse.wake {
-            background: #0f0;
-        }
-        
-        .alexa-pulse.stop {
-            background: #f00;
-        }
-        
+        /* Responsive */
         @media (max-width: 768px) {
             #alexaStatusContainer {
                 font-size: 12px !important;
-                padding: 6px !important;
-                margin: 5px 0 !important;
+                padding: 6px 10px !important;
+            }
+            
+            #mobileAlexaBtn {
+                width: 50px !important;
+                height: 50px !important;
+                font-size: 20px !important;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #mobileAlexaBtn {
+                width: 45px !important;
+                height: 45px !important;
+                font-size: 18px !important;
+                bottom: 80px !important;
+                right: 15px !important;
             }
         }
     `;
