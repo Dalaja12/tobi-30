@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberPet Ultra</title>
+    <link rel="shortcut icon" type="image/x-icon" href="img/cyberpet.png">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <link href="https://fonts.cdnfonts.com/css/open-dyslexic" rel="stylesheet">
+
+</head>
+<body>
+     <!-- Fondo interactivo -->
+     <div id="particles-js"></div>
+     <!-- 5 anillos holográficos distribuidos -->
+ <div class="light-ring" style="top: 10%; left: 12%;"></div>
+ <div class="light-ring" style="top: 30%; right: 18%;"></div>
+ <div class="light-ring" style="top: 55%; left: 40%;"></div>
+ <div class="light-ring" style="bottom: 25%; right: 10%;"></div>
+ <div class="light-ring" style="bottom: 15%; left: 22%;"></div>
+
+    <div class="top-buttons">
+        <button id="searchBtn" title="Buscador CyberPet">🔍</button>
+        <button id="customBtn" title="Personalizar">🎨</button>
+      </div>  
+
+          <!-- Contenedor principal -->
+    <div class="stats-tab" id="statsTab">📊</div>
+    <!-- Panel de estadísticas -->
+    <div class="stats-panel" id="statsPanel">
+    <div class="cyber-clock-kids">
+        <div class="time-display" id="current-time">--:-- -- <span class="time-emoji">🌞</span></div>
+        <div class="date-display" id="current-date">Cargando...</div>
+    </div>
+
+    <div class="stat">
+        <span class="stat-emoji">⚡</span>
+        <span class="stat-label">Energía:</span>
+        <span id="energy-level">100%</span>
+        <div class="progress-bar">
+            <div class="progress-fill" id="energy-bar"></div>
+        </div>
+    </div>
+
+    <div class="stat">
+        <span class="stat-emoji">😊</span>
+        <span class="stat-label">Ánimo:</span>
+        <span id="mood-status">Feliz</span>
+    </div>
+
+    <div class="stat">
+        <span class="stat-emoji">🍎</span>
+        <span class="stat-label">Comida:</span>
+        <span id="food-count">0</span>
+    </div>
+
+     <!-- Alexa Status se añadirá aquí con JavaScript -->
+     <div id="alexaStatusContainer"></div>
+            
+            <div class="cyber-radio">
+                <span id="station-name">🔴 Radio CyberPet</span>
+                <div class="radio-display">
+                    <div class="radio-controls">
+                        <button id="prev-btn" class="cyber-btn">⏮</button>
+                        <button id="play-btn" class="cyber-btn">▶</button>
+                        <button id="next-btn" class="cyber-btn">⏭</button>
+                    </div>
+                    <!-- Control de volumen -->
+                 <div class="volume-control">
+                  <input id="volume-slider" type="range" min="0" max="1" step="0.01" value="0.8">
+                  <span class="volume-label">🔊 Volumen</span>
+                </div>
+
+                </div>
+                <select id="station-select" class="cyber-select">
+                    <option value="https://stream.zeno.fm/1m42oahahycvv">Estación Hacker</option>
+                    <option value="https://stream.zeno.fm/4e68b4cw24zuv">Estación Retro</option>
+                </select>
+            </div>
+            
+            <audio id="radio-player" hidden></audio>
+        </div>
+
+                <!-- Cara del robot -->
+                <div class="bmo-screen">
+                    <div class="crt-effect"></div>
+                    <div class="face">
+                        <div class="eyes-container">
+                            <div class="eye" id="leftEye">
+                                <div class="pupil" id="leftPupil"></div>
+                            </div>
+                            <div class="eye" id="rightEye">
+                                <div class="pupil" id="rightPupil"></div>
+                            </div>
+                        </div>
+                        <div class="mouth" id="mouth"></div>
+                    </div>
+                </div>
+        
+                <!-- Controles -->
+                <div class="controls">
+                    <button class="expression-btn" onclick="changeExpression('happy')">
+                        <img src="img/feliz.png" alt="Feliz">
+                    </button>
+                    
+                    <button class="expression-btn" onclick="changeExpression('angry')">
+                        <img src="img/enojado.png" alt="Enojado">
+                    </button>
+                    
+                    <button class="expression-btn" onclick="changeExpression('sleep')">
+                        <img src="img/dormir.png" alt="Dormir">
+                    </button>
+                    
+                    <button class="expression-btn" onclick="changeExpression('surprised')">
+                        <img src="img/sorprendido.png" alt="Sorprendido">
+                    </button>
+                    
+                    <button onclick="showFoodWindow()">
+                        <img src="img/alimentar.png" alt="Alimentar">
+                    </button>
+                    <button onclick="takeSelfie()">
+                        <img src="img/selfie.png" alt="Selfie">
+                    </button>
+                    <button onclick="showGamesWindow()">
+                        <img src="img/jugar.png" alt="Jugar">
+                    </button>
+                    <button onclick="showCalculatorWindow()" title="Calculadora">
+                        <img src="img/calculadora.png" alt="🧮"> 
+                    </button>
+                    <button onclick="showNotesWindow()" title="Blog de Notas">
+                        <img src="img/notas.png" alt="📝"> 
+                    </button>
+                    <button onclick="showTranslatorWindow()" title="Traductor">
+                        <img src="img/traductor.png" alt="🌍">
+                    </button>
+                    <button onclick="showCalendarWindow()" title="Calendario">
+                        <img src="img/calendario.png" alt="📅">
+                    </button>
+                    <button onclick="showTVWindow()" title="TV Antigua">
+                        <img src="img/tv.png" alt="📺">
+                    </button>
+
+                    <!-- Botón Alexa independiente -->
+                     <button id="alexaBtn" title="Modo Alexa - Asistente por voz">🤖</button>
+                    
+                    <div id="helpBtn">?</div>
+                    
+                </div>
+                
+            </div>
+    
+    <!-- Ventana de Juegos -->
+    <div class="games-window" id="gamesWindow">
+        <div class="games-window-header">
+            <h3 class="games-window-title">Minijuegos CyberPet</h3>
+            <button class="close-btn" onclick="closeGamesWindow()">✖</button>
+        </div>
+        
+        <div class="game-selector">
+            <button class="nav-btn" onclick="prevGame()">◀</button>
+            
+            <div class="game-slider">
+                <button class="game-btn active" onclick="startGame('guess')">🔢 Adivina el Número</button>
+                <button class="game-btn" onclick="startGame('rps')">✊ Piedra, Papel o Tijera</button>
+                <button class="game-btn" onclick="startLetterHunt()">🔤 Caza de Letras</button>
+                <button class="game-btn" onclick="startMemoryGame()">🧠 Memoriza</button>
+                <button class="game-btn" onclick="startStoryGame()">📖 Ordena Historia</button>
+                <button class="game-btn" onclick="startSoundGame()">👂 Sonido Perdido</button>
+            </div>
+            
+            <button class="nav-btn" onclick="nextGame()">▶</button>
+        </div>
+        
+        <div class="game-container" id="gameContainer"></div>
+    </div>
+    
+
+    <!-- Panel de personalización -->
+    <div class="custom-panel" id="customPanel" class="floating-window">
+        <button class="close-btn" id="closePanel">✖</button>
+        <h4>Personalización</h4>
+        <!-- En el panel de personalización - DESPUÉS de la sección de color de boca -->
+<div class="custom-section">
+    <h5>🎭 Temporadas Especiales</h5>
+    <div class="season-options">
+        <button class="season-btn" onclick="activateSeason('christmas')">🎄 Navidad</button>
+        <button class="season-btn" onclick="activateSeason('halloween')">🎃 Halloween</button>
+        <button class="season-btn" onclick="activateSeason('valentine')">💝 San Valentín</button>
+        <button class="season-btn" onclick="activateSeason('easter')">🐰 Pascua</button>
+        <button class="season-btn" onclick="activateSeason('summer')">☀️ Verano</button>
+        <button class="season-btn" onclick="deactivateAllSeasons()">🚫 Sin Temporada</button>
+    </div>
+</div>
+      <!-- En el panel de personalización, después de la sección de temporadas -->
+<div class="custom-section">
+    <h5>🏠 Decorar Habitación</h5>
+    <div class="decorations-grid">
+        <button class="decor-btn" data-item="window" data-img="img/decor/window.png">
+            <img src="img/decor/window.png" alt="Ventana" class="decor-icon">
+            <span>Ventana</span>
+        </button>
+        <button class="decor-btn" data-item="lamp" data-img="img/decor/lamp.png">
+            <img src="img/decor/lamp.png" alt="Lámpara" class="decor-icon">
+            <span>Lámpara</span>
+        </button>
+        <button class="decor-btn" data-item="plant" data-img="img/decor/plant.png">
+            <img src="img/decor/plant.png" alt="Planta" class="decor-icon">
+            <span>Planta</span>
+        </button>
+        <button class="decor-btn" data-item="poster" data-img="img/decor/poster.png">
+            <img src="img/decor/poster.png" alt="Póster" class="decor-icon">
+            <span>Póster</span>
+        </button>
+        <button class="decor-btn" data-item="rug" data-img="img/decor/rug.png">
+            <img src="img/decor/rug.png" alt="Alfombra" class="decor-icon">
+            <span>Alfombra</span>
+        </button>
+        <button class="decor-btn" data-item="shelf" data-img="img/decor/shelf.png">
+            <img src="img/decor/shelf.png" alt="Estante" class="decor-icon">
+            <span>Estante</span>
+        </button>
+        <button class="decor-btn" data-item="computer" data-img="img/decor/computer.png">
+            <img src="img/decor/computer.png" alt="Computadora" class="decor-icon">
+            <span>Computadora</span>
+        </button>
+        <button class="decor-btn" data-item="bed" data-img="img/decor/bed.png">
+            <img src="img/decor/bed.png" alt="Cama" class="decor-icon">
+            <span>Cama</span>
+        </button>
+        <button class="clear-decor" onclick="clearAllDecorations()">
+            <span>🗑️ Eliminar Todo</span>
+        </button>
+    </div>
+</div>   
+        
+        <div class="custom-section">
+            <h5>Color Principal</h5>
+            <div class="color-options">
+                <div class="color-option" style="background: #0ff;" onclick="changeMainColor('#0ff')"></div>
+                <div class="color-option" style="background: #f0f;" onclick="changeMainColor('#f0f')"></div>
+                <div class="color-option" style="background: #0f0;" onclick="changeMainColor('#0f0')"></div>
+                <div class="color-option" style="background: #ff0;" onclick="changeMainColor('#ff0')"></div>
+                <div class="color-option" style="background: #f00;" onclick="changeMainColor('#f00')"></div>
+                <div class="color-option" style="background: #ff6600;" onclick="changeMainColor('#ff6600')"></div>
+                <button onclick="resetMainColor()" class="reset-btn" title="Restablecer">↺</button>
+            </div>
+        </div>
+        
+        <div class="custom-section">
+            <h5>Color de Ojos</h5>
+            <div class="color-options">
+                <div class="color-option" style="background: #0ff;" onclick="changeEyesColor('#0ff')"></div>
+                <div class="color-option" style="background: #f0f;" onclick="changeEyesColor('#f0f')"></div>
+                <div class="color-option" style="background: #0f0;" onclick="changeEyesColor('#0f0')"></div>
+                <div class="color-option" style="background: #ff0;" onclick="changeEyesColor('#ff0')"></div>
+                <div class="color-option" style="background: #f00;" onclick="changeEyesColor('#f00')"></div>
+                <div class="color-option" style="background: #00f;" onclick="changeEyesColor('#00f')"></div>
+                <button onclick="resetEyesColor()" class="reset-btn" title="Restablecer">↺</button>
+            </div>
+        </div>
+        
+        <div class="custom-section">
+            <h5>Color de Boca</h5>
+            <div class="color-options">
+                <div class="color-option" style="background: #ff0000;" onclick="changeMouthColor('#ff0000')"></div>
+                <div class="color-option" style="background: #ff6600;" onclick="changeMouthColor('#ff6600')"></div>
+                <div class="color-option" style="background: #ff00ff;" onclick="changeMouthColor('#ff00ff')"></div>
+                <div class="color-option" style="background: #00ff00;" onclick="changeMouthColor('#00ff00')"></div>
+                <div class="color-option" style="background: #9900ff;" onclick="changeMouthColor('#9900ff')"></div>
+                <div class="color-option" style="background: #ffff00;" onclick="changeMouthColor('#ffff00')"></div>
+                <button onclick="resetMouthColor()" class="reset-btn" title="Restablecer">↺</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de búsqueda -->
+    <div class="search-panel" id="searchPanel" class="floating-window" >
+        <div class="search-header">
+            <h3 class="search-title">Buscador CyberPet</h3>
+            <button class="search-close" id="searchClose" title="Cerrar">✖</button>
+        </div>
+        <div class="chat-container" id="chatContainer">
+            <div class="bot-message">
+                Hola! Soy CyberPet, tu ayudante virtual
+                <p> 🔎 Puedo ayudarte a buscar información segura sobre temas como animales, historia, ciencia y más.</p>
+                <p> ✨ Escribe el nombre del tema que quieres conocer (por ejemplo: tortugas, planetas, dinosaurios).</p>
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="userInput" placeholder="Escribe tu pregunta..." autocomplete="off">
+            <button onclick="hideAutocomplete(); sendQuestion();" class="send-btn" title="Enviar pregunta">🚀</button>
+
+        </div>
+        <div class="autocomplete-container">
+            <div id="autocompleteList"></div>
+        </div>
+
+        <div class="voice-controls">
+            <button id="voiceCommandBtn" onclick="startVoiceCommand()" title="Comando de voz">🎤</button>
+            <button id="playBtn" class="voice-btn" title="Reproducir" disabled>▶️</button>
+            <button id="pauseBtn" class="voice-btn" title="Pausar" disabled>⏯️</button>
+            <button id="stopBtn" class="voice-btn" title="Detener" disabled>❌</button>
+        </div>
+       
+    </div>
+
+
+
+<!-- Ventana de ayuda centrada -->
+<div id="helpModal">
+    <div class="help-box">
+        <button class="help-close">✖</button>
+
+        <h2>❓ Guía de Ayuda – CyberPet Ultra</h2>
+
+        <p>CyberPet Ultra fue diseñado para ayudar a niños en su aprendizaje, atención y desarrollo cognitivo mediante herramientas interactivas.</p>
+
+        <h3>🎮 Minijuegos Terapéuticos</h3>
+
+        <div class="help-section">
+            <h4>1. Caza de Letras (Dislexia)</h4>
+            <p><strong>Objetivo:</strong> Mejorar reconocimiento de letras similares (b/d, p/q).</p>
+            <p><strong>Beneficio:</strong> Refuerza memoria visual y orientación espacial.</p>
+
+            <h4>2. Memoriza la Secuencia (TDAH)</h4>
+            <p><strong>Objetivo:</strong> Entrenar memoria de trabajo y atención sostenida.</p>
+            <p><strong>Beneficio:</strong> Mejora concentración mediante patrones visuales y auditivos.</p>
+
+            <h4>3. Ordena la Historia (Autismo)</h4>
+            <p><strong>Objetivo:</strong> Comprender secuencias lógicas.</p>
+            <p><strong>Beneficio:</strong> Ayuda en estructuración temporal y habilidades narrativas.</p>
+
+            <h4>4. El Sonido Perdido (Procesamiento Auditivo)</h4>
+            <p><strong>Objetivo:</strong> Identificar sonidos omitidos.</p>
+            <p><strong>Beneficio:</strong> Fortalece conciencia fonológica.</p>
+        </div>
+
+        <h3>📻 Radio & TV – Comunicación y Relajación</h3>
+        <p>Las estaciones y videos ayudan a mejorar la regulación emocional, la comprensión auditiva y permiten un descanso sensorial.</p>
+
+        <h3>🖼️ Imágenes de ejemplo</h3>
+        <div class="help-images">
+            <img src="img/logos/Zorb FM.png" alt="">
+            <img src="img/logos/Wikipedia.png" alt="">
+            <img src="img/logos/utt.png" alt="">
+            <img src="img/selfie.png" alt="">
+        </div>
+    </div>
+</div>
+
+
+   <!-- Ventana de TV Antigua - Versión Final -->
+<div class="tv-window" id="tvWindow">
+    <div class="tv-window-header">
+        <h3 class="tv-window-title">📺 CyberPet TV Antigua</h3>
+        <button class="close-btn" onclick="closeTVWindow()">✖</button>
+    </div>
+    
+    <div class="tv-container">
+        <!-- Marco de TV -->
+        <div class="tv-frame">
+            <div class="tv-screen" id="tvScreen">
+                <div class="tv-overlay">
+                    <div class="scanlines"></div>
+                    <div class="flicker"></div>
+                    <div class="vignette"></div>
+                </div>
+                
+                <!-- Contenedor del video centrado -->
+                <div class="youtube-container" id="youtubeContainer">
+                    <div class="tv-off-message" id="tvOffMessage">
+                        <div class="tv-off-text">📺 CYBERPET TV</div>
+                        <div class="tv-channel">CANAL 1</div>
+                        <button class="tv-power-btn" onclick="turnOnTV()">⚡ ENCENDER</button>
+                    </div>
+                    <iframe id="youtubeIframe" width="100%" height="100%" 
+                            src="" frameborder="0" 
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                            allowfullscreen style="display: none;">
+                    </iframe>
+                </div>
+                
+                <div class="tv-banner" id="tvBanner">
+                    <span class="banner-text">🔴 TV EN LÍNEA</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Panel de controles -->
+        <div class="tv-controls-panel">
+            <div class="controls-row">
+                <button class="tv-btn power-btn off" onclick="toggleTVPower()" title="Encender TV">
+                    ⏻
+                </button>
+                <button class="tv-btn" onclick="previousVideo()" title="Video Anterior">
+                    ⏮
+                </button>
+                <button class="tv-btn tv-btn-large" onclick="playPauseTV()" title="Reproducir">
+                    ⏯
+                </button>
+                <button class="tv-btn" onclick="nextVideo()" title="Siguiente Video">
+                    ⏭
+                </button>
+                <button class="tv-btn audio-btn" onclick="toggleAudio()" title="Audio">
+                    🔈
+                </button>
+            </div>
+            
+            <div class="controls-row">
+                <div class="channel-selector">
+                    <div class="channel-display">
+                        <span class="channel-number" id="currentChannelNumber">1</span>
+                        <span class="channel-name" id="currentChannelName">Dibujos</span>
+                    </div>
+                    <div class="channel-nav">
+                        <button class="channel-nav-btn" onclick="previousChannel()" title="Canal Anterior">
+                            ◀
+                        </button>
+                        <button class="channel-nav-btn" onclick="nextChannel()" title="Siguiente Canal">
+                            ▶
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Ventana de Calendario -->
+<div class="calendar-window" id="calendarWindow">
+    <div class="calendar-window-header">
+        <h3 class="calendar-window-title">Calendario CyberPet</h3>
+        <button class="close-btn" onclick="closeCalendarWindow()">✖</button>
+    </div>
+    <div class="calendar-container">
+        <div class="calendar-controls">
+            <button onclick="changeMonth(-1)" class="calendar-nav-btn">◀</button>
+            <h4 id="currentMonthYear">Cargando...</h4>
+            <button onclick="changeMonth(1)" class="calendar-nav-btn">▶</button>
+        </div>
+        
+        <div class="calendar-grid" id="calendarGrid">
+            <!-- Los días se generarán con JavaScript -->
+        </div>
+        
+        <div class="events-section">
+            <h4>Eventos del Día</h4>
+            <div class="events-list" id="eventsList">
+                <div class="no-events">No hay eventos para hoy</div>
+            </div>
+            <div class="add-event-form">
+                <input type="text" id="newEventInput" placeholder="Nuevo evento...">
+                <input type="date" id="eventDateInput">
+                <button onclick="addEvent()" class="add-event-btn">➕ Agregar</button>
+            </div>
+        </div>
+        
+        <div class="calendar-actions">
+            <button onclick="saveCalendarData()" class="save-calendar-btn">💾 Guardar Calendario</button>
+            <button onclick="clearAllEvents()" class="clear-calendar-btn">🗑️ Limpiar Todo</button>
+        </div>
+    </div>
+</div>
+    
+    <!-- Ventana de Traductor -->
+<div class="translator-window" id="translatorWindow">
+    <div class="translator-window-header">
+        <h3 class="translator-window-title">Traductor CyberPet</h3>
+        <button class="close-btn" onclick="closeTranslatorWindow()">✖</button>
+    </div>
+    <div class="translator-container">
+        <div class="language-selector">
+            <select id="sourceLanguage">
+                <option value="es">Español</option>
+                <option value="en">Inglés</option>
+            </select>
+            <button onclick="swapLanguages()" title="Intercambiar idiomas">⇄</button>
+            <select id="targetLanguage">
+                <option value="en">Inglés</option>
+                <option value="es">Español</option>
+            </select>
+        </div>
+        <textarea id="sourceText" placeholder="Escribe texto aquí..."></textarea>
+        <button onclick="translateText()" class="translate-btn">Traducir</button>
+        <div id="translationResult" class="translation-result"></div>
+    </div>
+</div>
+
+    <!-- Blog de Notas -->
+<div class="notes-window" id="notesWindow">
+    <div class="notes-window-header">
+        <h3 class="notes-window-title">📝 Mis Tareas</h3>
+        <button class="close-btn" onclick="closeNotesWindow()">✖</button>
+    </div>
+    <div class="notes-toolbar">
+        <button onclick="formatText('bold')" title="Negrita"><b>B</b></button>
+        <button onclick="formatText('italic')" title="Cursiva"><i>I</i></button>
+        <button onclick="formatText('underline')" title="Subrayado"><u>U</u></button>
+        <button class="format-btn" id="colorHighlighter" onclick="cycleHighlightColor()" title="Resaltar - Amarillo"> 🟨</button>
+        <input type="color" class="color-picker" id="textColor" value="#000000" title="Color del texto">
+        <button onclick="saveAsWord()" class="save-btn" title="Guardar como Word">💾 Guardar</button>
+    </div>
+    <div id="notesContent" class="notes-content" contenteditable="true">
+        ¡Escribe aquí tus tareas! Puedes usar colores, negritas y más.
+    </div>
+</div>
+
+    <!-- Calculadora CyberPet -->
+<div class="calculator-window" id="calculatorWindow">
+    <div class="calculator-window-header">
+        <h3 class="calculator-window-title">Calculadora CyberPet</h3>
+        <button class="close-btn" onclick="closeCalculatorWindow()">✖</button>
+    </div>
+    <div class="calculator-display">
+        <div id="operationDisplay" class="operation-display"></div>
+        <div id="resultDisplay" class="result-display">0</div>
+    </div>
+    <div class="calculator-buttons">
+        <button onclick="appendToCalc('7')" class="calc-btn">7</button>
+        <button onclick="appendToCalc('8')" class="calc-btn">8</button>
+        <button onclick="appendToCalc('9')" class="calc-btn">9</button>
+        <button onclick="setOperator('+')" class="calc-btn operator">+</button>
+        
+        <button onclick="appendToCalc('4')" class="calc-btn">4</button>
+        <button onclick="appendToCalc('5')" class="calc-btn">5</button>
+        <button onclick="appendToCalc('6')" class="calc-btn">6</button>
+        <button onclick="setOperator('-')" class="calc-btn operator">-</button>
+        
+        <button onclick="appendToCalc('1')" class="calc-btn">1</button>
+        <button onclick="appendToCalc('2')" class="calc-btn">2</button>
+        <button onclick="appendToCalc('3')" class="calc-btn">3</button>
+        <button onclick="setOperator('*')" class="calc-btn operator">×</button>
+        
+        <button onclick="appendToCalc('0')" class="calc-btn">0</button>
+        <button onclick="appendToCalc('.')" class="calc-btn">.</button>
+        <button onclick="calculate()" class="calc-btn equals">=</button>
+        <button onclick="setOperator('/')" class="calc-btn operator">÷</button>
+        
+        <button onclick="clearCalc()" class="calc-btn clear">C</button>
+        <button onclick="backspace()" class="calc-btn clear">⌫</button>
+    </div>
+</div>
+
+    <!-- Ventana de comida -->
+    <div class="food-window" id="foodWindow">
+        <div class="food-window-header">
+            <h3 class="food-window-title">Selecciona comida</h3>
+            <button class="close-btn" onclick="closeFoodWindow()">✖</button>
+        </div>
+        <div class="food-grid" id="foodGrid">
+            <!-- Los emojis se agregarán con JavaScript -->
+        </div>
+    </div>
+
+    <!-- Comida en cursor -->
+    <div class="food-cursor" id="foodCursor"></div>
+
+    <script src="script.js"></script>
+    <script src="cerebro/responses.js"></script>
+    <script src="cerebro/primaria/espanol.js"></script>
+    <script src="cerebro/primaria/matematicas.js"></script>
+    <script src="cerebro/alexa-assistant.js"></script>
+    
+</body>
+</html>
