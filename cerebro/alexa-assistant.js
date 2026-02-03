@@ -1,11 +1,12 @@
-// Alexa Assistant - Usa tu sistema de animación de boca y quita emojis
+// Alexa Assistant - Micrófono SIEMPRE activo, puede interrumpir
 class AlexaAssistant {
     constructor() {
-        this.isActive = false;
-        this.isListeningForWakeWord = false;
+        this.isActive = false; // Empezar apagado
+        this.isListening = true; // Siempre escuchar cuando está activo
         this.isSpeaking = false;
         this.recognition = null;
         this.wakeWord = "alexa";
+        this.currentUtterance = null;
         
         this.toggleAlexa = this.toggleAlexa.bind(this);
         this.setupRecognition = this.setupRecognition.bind(this);
@@ -22,53 +23,61 @@ class AlexaAssistant {
     setupRecognition() {
         if ('webkitSpeechRecognition' in window) {
             this.recognition = new webkitSpeechRecognition();
-            this.recognition.continuous = false;
+            this.recognition.continuous = true; // ✅ ESCUCHA CONTINUA
             this.recognition.interimResults = false;
             this.recognition.lang = 'es-ES';
             this.recognition.maxAlternatives = 1;
             
             this.recognition.onstart = () => {
-                console.log('🎤 Escuchando...');
-                this.showStatusIndicator('Escuchando...', true);
-                this.playBeep(600, 0.1); // 🔊 Sonido de escucha
+                console.log('🎤 Micrófono SIEMPRE activo...');
+                this.showStatusIndicator('🎤 Escuchando...', true);
             };
             
             this.recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript.toLowerCase().trim();
-                console.log('Escuché:', transcript);
-                
-                if (this.isListeningForWakeWord) {
-                    if (transcript.startsWith(this.wakeWord + ' ') || 
-                        transcript === this.wakeWord ||
-                        transcript.startsWith(this.wakeWord + ',') ||
-                        transcript.startsWith(this.wakeWord + '.')) {
+                // Tomar TODOS los resultados acumulados
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript.toLowerCase().trim();
+                    console.log('Escuché (mientras habla):', transcript);
+                    
+                    // ✅ PROCESAR INMEDIATAMENTE si contiene "alexa" y estamos activos
+                    if (this.isActive && this.isListening && transcript.includes(this.wakeWord)) {
+                        console.log('✅ "Alexa" detectado DURANTE habla');
+                        this.playBeep(800, 0.2);
                         
-                        console.log('✅ Alexa detectada');
-                        this.playBeep(800, 0.2); // 🔊 Sonido de wake word
+                        // Parar de hablar inmediatamente si está hablando
+                        if (this.isSpeaking) {
+                            this.stopSpeakingCompletely();
+                        }
+                        
+                        // Procesar el comando
                         this.processAlexaCommand(transcript);
+                        break; // Procesar solo el primero
                     }
                 }
             };
             
             this.recognition.onerror = (event) => {
-                if (event.error === 'no-speech') {
-                    setTimeout(() => {
-                        if (this.isActive && this.isListeningForWakeWord) {
-                            this.startListening();
-                        }
-                    }, 1000);
-                }
+                console.log('Error reconocimiento:', event.error);
             };
             
             this.recognition.onend = () => {
-                if (this.isActive && this.isListeningForWakeWord) {
-                    setTimeout(() => this.startListening(), 500);
+                console.log('Reconocimiento terminado - REINICIANDO...');
+                // ✅ SIEMPRE REINICIAR si está activo
+                if (this.isActive && this.isListening) {
+                    setTimeout(() => {
+                        try {
+                            this.recognition.start();
+                            console.log('🔄 Micrófono reiniciado');
+                        } catch (e) {
+                            setTimeout(() => this.startListening(), 1000);
+                        }
+                    }, 100);
                 }
             };
         }
     }
     
-    // 🔊 SONIDOS SIMPLES
+    // 🔊 SONIDOS
     playBeep(freq, duration) {
         try {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -100,18 +109,19 @@ class AlexaAssistant {
         if (!this.isActive) {
             // ACTIVAR
             this.isActive = true;
-            this.isListeningForWakeWord = true;
+            this.isListening = true;
             
             alexaBtn.classList.add('active');
             alexaBtn.innerHTML = '<img src="img/decor/bed.png" alt="Alexa activa" class="alexa-icon">';
             
             this.startListening();
-            this.showStatusIndicator('Di "Alexa" para activarme', false);
+            this.showStatusIndicator('Di "Alexa"', false);
+            console.log('✅ Alexa ACTIVADA - Micrófono SIEMPRE activo');
             
         } else {
             // DESACTIVAR
             this.isActive = false;
-            this.isListeningForWakeWord = false;
+            this.isListening = false;
             
             alexaBtn.classList.remove('active');
             alexaBtn.innerHTML = '🤖';
@@ -119,11 +129,12 @@ class AlexaAssistant {
             this.stopListening();
             this.hideStatusIndicator();
             this.stopSpeakingCompletely();
+            console.log('⏸️ Alexa DESACTIVADA');
         }
     }
     
     processAlexaCommand(transcript) {
-        console.log('Procesando comando Alexa:', transcript);
+        console.log('Procesando:', transcript);
         
         let command = '';
         
@@ -137,12 +148,20 @@ class AlexaAssistant {
             command = transcript.substring(this.wakeWord.length + 1).trim();
         }
         
-        console.log('Comando extraído:', command);
+        console.log('Comando:', command);
         
+        // ✅ COMANDOS DE DETENER - funcionan INMEDIATAMENTE
         if (this.isStopCommand(command)) {
-            console.log('🚫 COMANDO DE DETENER DETECTADO');
-            this.playBeep(400, 0.3); // 🔊 Sonido de stop
-            this.executeStopCommand();
+            console.log('🚫 DETENER detectado');
+            this.playBeep(400, 0.3);
+            this.stopSpeakingCompletely();
+            this.showStatusIndicator('🛑 Detenido', false, true);
+            
+            setTimeout(() => {
+                if (this.isActive) {
+                    this.showStatusIndicator('Di "Alexa"', false);
+                }
+            }, 1500);
             return;
         }
         
@@ -169,63 +188,40 @@ class AlexaAssistant {
                 command === stopWord + '.' ||
                 command === stopWord + ',' ||
                 command === stopWord + '!') {
-                console.log('Palabra de detener encontrada:', stopWord);
                 return true;
             }
         }
-        
         return false;
     }
     
-    executeStopCommand() {
-        console.log('🚫 EJECUTANDO COMANDO DE DETENER');
-        
-        this.stopSpeakingCompletely();
-        this.showVisualConfirmation('🛑 Detenido');
-        
-        setTimeout(() => {
-            this.showStatusIndicator('Di "Alexa" para activarme', false);
-        }, 1500);
-        
-        return;
-    }
-    
     stopSpeakingCompletely() {
-        console.log('🔇 Callando completamente...');
+        console.log('🔇 Callando INMEDIATAMENTE...');
         
         if (window.speechSynthesis) {
             window.speechSynthesis.cancel();
         }
         
-        // 🔇 Detener animación de boca usando tu sistema
-        this.stopMouthAnimation();
-        
-        this.isSpeaking = false;
-    }
-    
-    stopMouthAnimation() {
+        // Detener animación de boca
         const mouth = document.getElementById('mouth');
         if (mouth) {
             mouth.classList.remove('surprised');
             mouth.classList.add('happy');
         }
-    }
-    
-    showVisualConfirmation(message) {
-        this.showStatusIndicator(message, false, true);
+        
+        this.isSpeaking = false;
+        this.currentUtterance = null;
     }
     
     processQuestion(question) {
-        console.log('Alexa procesando pregunta:', question);
+        console.log('Procesando pregunta:', question);
         
-        // 🔍 USAR TU SISTEMA DE BÚSQUEDA COMPLETO
+        // 🔍 USAR TU SISTEMA
         this.searchForAlexa(question);
     }
     
     async searchForAlexa(query) {
-        console.log('Alexa usando TU sistema searchWeb para:', query);
+        console.log('Buscando:', query);
         
-        // 🔍 PRIMERO: Usar getPredefinedResponse
         if (typeof getPredefinedResponse === 'function') {
             const predefinedResponse = getPredefinedResponse(query);
             
@@ -234,7 +230,6 @@ class AlexaAssistant {
                 
                 if (typeof predefinedResponse === 'object' && predefinedResponse.action) {
                     responseText = predefinedResponse.text;
-                    // Ejecutar acción después de hablar
                     this.speakResponse(responseText);
                     setTimeout(() => {
                         if (predefinedResponse.action) {
@@ -249,30 +244,23 @@ class AlexaAssistant {
             }
         }
         
-        // 🔍 SEGUNDO: Usar searchWeb
         if (typeof searchWeb === 'function') {
-            // Crear un contenedor temporal para capturar la respuesta
             await this.captureSearchWebResponse(query);
         } else {
-            // Fallback
-            this.speakResponse('No pude encontrar información sobre eso.');
+            this.speakResponse('No pude encontrar información.');
         }
     }
     
     async captureSearchWebResponse(query) {
         return new Promise((resolve) => {
-            // Guardar funciones originales
             const originalAddMessage = window.addMessage;
             const originalShowTypingIndicator = window.showTypingIndicator;
             
-            // 🔄 INTERCEPTAR LAS FUNCIONES DE TU CHAT
             let capturedResponse = '';
             let responseCaptured = false;
             
-            // Interceptar addMessage para capturar respuestas
             window.addMessage = (text, sender) => {
                 if (sender === 'bot' && !responseCaptured) {
-                    // 🔤 QUITAR EMOJIS del texto
                     const cleanText = this.removeEmojis(text);
                     
                     if (!cleanText.includes('Buscando') && 
@@ -283,10 +271,8 @@ class AlexaAssistant {
                         capturedResponse = cleanText;
                         responseCaptured = true;
                         
-                        // Hablar la respuesta capturada (sin emojis)
                         this.speakResponse(capturedResponse);
                         
-                        // Restaurar funciones originales
                         window.addMessage = originalAddMessage;
                         window.showTypingIndicator = originalShowTypingIndicator;
                         
@@ -295,40 +281,34 @@ class AlexaAssistant {
                     }
                 }
                 
-                // Si no es bot o es mensaje de búsqueda, usar función original
                 if (originalAddMessage) {
                     originalAddMessage(text, sender);
                 }
             };
             
-            // Interceptar showTypingIndicator
             window.showTypingIndicator = () => {
                 if (originalShowTypingIndicator) {
                     originalShowTypingIndicator();
                 }
             };
             
-            // Llamar a TU función searchWeb
             try {
                 searchWeb(query);
                 
-                // Timeout de seguridad
                 setTimeout(() => {
                     if (!responseCaptured) {
-                        this.speakResponse('No encontré información sobre eso.');
+                        this.speakResponse('No encontré información.');
                     }
                     
-                    // Restaurar funciones
                     window.addMessage = originalAddMessage;
                     window.showTypingIndicator = originalShowTypingIndicator;
                     resolve();
                 }, 10000);
                 
             } catch (error) {
-                console.error('Error en searchWeb:', error);
-                this.speakResponse('Hubo un error al buscar la información.');
+                console.error('Error:', error);
+                this.speakResponse('Hubo un error.');
                 
-                // Restaurar funciones
                 window.addMessage = originalAddMessage;
                 window.showTypingIndicator = originalShowTypingIndicator;
                 resolve();
@@ -336,81 +316,126 @@ class AlexaAssistant {
         });
     }
     
-    // 🔤 FUNCIÓN PARA QUITAR EMOJIS (igual que tu función removeEmojis)
     removeEmojis(str) {
         return str.replace(/[\p{Extended_Pictographic}]/gu, '');
     }
     
     speakResponse(text) {
-        console.log('Alexa va a hablar:', text);
+        console.log('Alexa hablando (micrófono sigue activo):', text.substring(0, 50) + '...');
         this.isSpeaking = true;
         
-        // 🔤 QUITAR EMOJIS antes de hablar
         const cleanText = this.removeEmojis(text);
         
-        // 🎤 USAR TU FUNCIÓN speak (la misma que llama playBtn)
         if (typeof speak === 'function') {
-            // Llamar a TU función speak que ya maneja las animaciones de boca
+            // Interceptar la función speak para mantener micrófono activo
+            this.interceptSpeechSynthesis();
             speak(cleanText);
             
-            // Configurar para volver a escuchar cuando termine de hablar
-            this.setupSpeechEndDetection();
-            
         } else if (window.speechSynthesis) {
-            // Si speak no existe, usar speakDirectly con animaciones
-            this.speakDirectly(cleanText);
+            this.speakWithContinuousListening(cleanText);
         }
     }
     
-    setupSpeechEndDetection() {
-        // Detectar cuando termine de hablar para volver a escuchar
-        const checkSpeechEnd = setInterval(() => {
-            if (!window.speechSynthesis.speaking && !this.isSpeaking) {
-                clearInterval(checkSpeechEnd);
+    interceptSpeechSynthesis() {
+        const originalSpeak = window.speechSynthesis.speak;
+        const self = this;
+        
+        window.speechSynthesis.speak = function(utterance) {
+            self.currentUtterance = utterance;
+            
+            // Configurar eventos en el utterance
+            utterance.onstart = function() {
+                self.isSpeaking = true;
+                console.log('🗣️ Alexa empezó a hablar (micrófono ACTIVO)');
                 
-                this.isSpeaking = false;
-                if (this.isActive) {
-                    this.showStatusIndicator('Di "Alexa" para activarme', false);
-                    this.startListening();
+                // ✅ ANIMACIÓN DE BOCA
+                const mouth = document.getElementById('mouth');
+                if (mouth) {
+                    self.talkInterval = setInterval(() => {
+                        mouth.classList.toggle('surprised');
+                    }, 200);
                 }
-            }
-        }, 500);
+            };
+            
+            utterance.onend = function() {
+                self.isSpeaking = false;
+                console.log('✅ Alexa terminó de hablar');
+                
+                // ✅ DETENER ANIMACIÓN
+                if (self.talkInterval) {
+                    clearInterval(self.talkInterval);
+                }
+                
+                const mouth = document.getElementById('mouth');
+                if (mouth) {
+                    mouth.classList.remove('surprised');
+                    mouth.classList.add('happy');
+                }
+                
+                // Restaurar función original
+                window.speechSynthesis.speak = originalSpeak;
+            };
+            
+            utterance.onerror = function(event) {
+                console.error('Error al hablar:', event);
+                self.isSpeaking = false;
+                
+                if (self.talkInterval) {
+                    clearInterval(self.talkInterval);
+                }
+                
+                const mouth = document.getElementById('mouth');
+                if (mouth) {
+                    mouth.classList.remove('surprised');
+                    mouth.classList.add('happy');
+                }
+                
+                window.speechSynthesis.speak = originalSpeak;
+            };
+            
+            return originalSpeak.call(this, utterance);
+        };
     }
     
-    speakDirectly(text) {
+    speakWithContinuousListening(text) {
         if (!window.speechSynthesis) return;
         
-        // 🔉 BAJAR volumen de otros medios
+        // 🔉 BAJAR volumen temporalmente
         this.lowerMediaVolume();
         
-        // Crear utterance
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'es-ES';
         utterance.rate = 0.85;
         utterance.pitch = 0.9;
         
-        // 🎤 VARIABLE para controlar la animación de boca
-        let talkInterval = null;
+        this.currentUtterance = utterance;
+        
+        // 🎤 ANIMACIÓN DE BOCA
+        this.talkInterval = null;
         const mouth = document.getElementById('mouth');
         
         utterance.onstart = () => {
             this.isSpeaking = true;
+            console.log('🗣️ Alexa empezó a hablar (micrófono SIGUE ACTIVO)');
             
-            // 🎤 INICIAR ANIMACIÓN DE BOCA (igual que tu código)
             if (mouth) {
-                talkInterval = setInterval(() => {
+                this.talkInterval = setInterval(() => {
                     mouth.classList.toggle('surprised');
                 }, 200);
+            }
+            
+            // ✅ IMPORTANTE: Asegurar que el micrófono siga activo
+            if (!this.recognition || this.recognition.ended) {
+                this.startListening();
             }
         };
         
         utterance.onend = () => {
             this.isSpeaking = false;
+            console.log('✅ Alexa terminó de hablar - Micrófono LISTO para nuevo comando');
             
-            // 🎤 DETENER ANIMACIÓN DE BOCA
-            if (talkInterval) {
-                clearInterval(talkInterval);
-                talkInterval = null;
+            if (this.talkInterval) {
+                clearInterval(this.talkInterval);
             }
             
             if (mouth) {
@@ -421,19 +446,18 @@ class AlexaAssistant {
             // 🔉 RESTAURAR volumen
             this.restoreMediaVolume();
             
+            // Mostrar que está lista
             if (this.isActive) {
-                this.showStatusIndicator('Di "Alexa" para activarme', false);
-                this.startListening();
+                this.showStatusIndicator('Di "Alexa"', false);
             }
         };
         
         utterance.onerror = (event) => {
-            console.error('Error al hablar:', event);
+            console.error('Error:', event);
             this.isSpeaking = false;
             
-            // 🎤 DETENER ANIMACIÓN DE BOCA en caso de error
-            if (talkInterval) {
-                clearInterval(talkInterval);
+            if (this.talkInterval) {
+                clearInterval(this.talkInterval);
             }
             
             if (mouth) {
@@ -444,15 +468,13 @@ class AlexaAssistant {
             this.restoreMediaVolume();
             
             if (this.isActive) {
-                this.showStatusIndicator('Di "Alexa" para activarme', false);
-                this.startListening();
+                this.showStatusIndicator('Di "Alexa"', false);
             }
         };
         
         window.speechSynthesis.speak(utterance);
     }
     
-    // 🔉 Control de volumen simple
     lowerMediaVolume() {
         try {
             const audios = document.querySelectorAll('audio');
@@ -478,7 +500,7 @@ class AlexaAssistant {
     }
     
     startListening() {
-        if (this.recognition && this.isActive && !this.isSpeaking) {
+        if (this.recognition && this.isActive && this.isListening) {
             try {
                 this.recognition.start();
             } catch (error) {
@@ -491,9 +513,7 @@ class AlexaAssistant {
         if (this.recognition) {
             try {
                 this.recognition.stop();
-            } catch (error) {
-                // Ignorar error
-            }
+            } catch (error) {}
         }
     }
     
@@ -548,6 +568,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         const assistant = new AlexaAssistant();
         window.alexaAssistant = assistant;
-        console.log('✅ Alexa Assistant listo - Con animación de boca y sin emojis');
+        console.log('✅ Alexa Assistant listo - Micrófono SIEMPRE activo, puede interrumpir');
     }, 1000);
 });
